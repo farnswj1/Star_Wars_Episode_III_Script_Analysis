@@ -1,0 +1,474 @@
+---
+title: "Star Wars Episode III Script Analysis"
+author: "Justin Farnsworth"
+date: "August 26, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Summary
+On May 19, 2005, *Star Wars: Episode III - Revenge of the Sith*, the third and final installation of the Star Wars Prequel Trilogy, was released. The movie told the story about a young, but powerful Jedi knight that succumbed to dark side out of fear of his wife dying. It also showed the extermination of the Jedi as well as the fall of the Galactic Republic, which would be replaced by the Galactic Empire, with a Sith lord at the helm. The movie helps transition the saga into the Original Trilogy.
+
+In this project, we used the Bing and NRC sentiments to analyze the script. We kept only the dialogue and omitted everything that wasn't intended to be spoken. We found that the most popular word in the movie was `jedi`. Similarly, the most common positive and negative words were `master` and `dark` respectively. We also found that Anakin is relatively more positive than the other characters in the movie. Characters like Palpatine express more anger than the others, however this is expected due to the fact that he is a Sith lord. Jedi Master Ki-Adi-Mundi was considered to be consistently very negative in both analyses; he was considered to be the most negative according to the NRC sentiments. However, Palptine was the most negative according to the Bing sentiments.
+
+NOTE: The analysis was done on the script of the movie, not the movie itself. The dialogue may be different in the movie than in the script.
+
+This script can be accessed here:
+<https://www.imsdb.com/scripts/Star-Wars-Revenge-of-the-Sith.html>
+
+For this project, the following packages were used.
+
+```{r load_packages, message = FALSE, warning = FALSE}
+# Required packages
+if (!require(tidyverse)) { install.packages("tidyverse"); library(tidyverse) }
+if (!require(tidytext)) { install.packages("tidytext"); library(tidytext) }
+if (!require(R.utils)) { install.packages("R.utils"); library(R.utils) }
+if (!require(rvest)) { install.packages("rvest"); library(rvest) }
+```
+
+
+# Loading The Data
+The page didn't provide a downloadable file of the script. To obtain the script, we extracted the script via web scraping. 
+
+The following code was used to extract the script from the HTML page:
+
+```{r load_movie_script, results = "hide"}
+# Download the script
+# Source: Internet Movie Screenplay Database
+url <- "https://www.imsdb.com/scripts/Star-Wars-Revenge-of-the-Sith.html"
+html_page <- read_html(url) %>% html_nodes("table")
+
+# Extract the script from the page
+script <- html_page[13] %>% html_text
+
+# Remove the HTML page variable
+rm(html_page)
+```
+
+
+# Cleaning The Data
+Since we're interested in the dialogue, we omitted everything but the dialogue. The lines could be mostly filtered by checking for the colon followed by a space. The remaining text had to be removed directly.
+
+Regarding the names of the characters, we noticed a lot of inconsistencies. Some of the character's names were misspelled and aliases were present. To ensure the names are uniform, the names were corrected and aliases were changed to the character's original name. For example, Darth Vader was changed to Anakin since this refers to the same person.
+
+The lines were the easiest to clean up as we removed any parantheses along with the text inside them. We also have to fix several character symbols that were converted to their hexadecimal representation when loading the HTML page.
+
+```{r clean_up_script, results = "hide"}
+# Convert the script into a data frame
+script <- unlist(str_split(script, "\\n|\\r|\\t")) %>% 
+  as_tibble() %>% 
+  rename(Line = value)
+
+# Keep only the dialogue and split the name and quotes into separate columns
+script <- script %>% 
+  filter(!str_detect(Line, "^$")) %>% 
+  filter(!str_detect(Line, "STAR WARS EPISODE 3: REVENGE OF THE SITH SCRIPT")) %>% 
+  filter(!str_detect(Line, "Star Wars: Revenge of the Sith")) %>% 
+  filter(str_detect(Line, ": "))  %>% 
+  separate(Line, into = c("Character", "Line"), sep = ": ", extra = "merge")
+
+# Clean up the character names in the script
+# Note: Aliases have been changed to the character's actual name
+script <- script %>% 
+  mutate(Character = str_replace(Character, "ANAKINN|DARTH VADER", "ANAKIN")) %>% 
+  mutate(Character = str_replace(Character, "^BAIL$", "BAIL ORGANA")) %>% 
+  mutate(Character = str_replace(Character, "^CLONE PILOT$", "CLONE PILOT 1")) %>% 
+  mutate(Character = str_replace(Character, "^DA[BR]TH S[Il]DIOUS", "PALPATINE")) %>% 
+  mutate(Character = str_replace(Character, "FANGZAR", "FANG ZAR")) %>% 
+  mutate(Character = str_replace(Character, "FlRESHIP PILOT", "FIRESHIP PILOT")) %>% 
+  mutate(Character = str_replace(Character, "^G-3PO$|^THREEPIO$", "C-3PO")) %>% 
+  mutate(Character = str_replace(Character, "G[il]DDEAN DANU", "GIDDEAN DANU")) %>% 
+  mutate(Character = str_replace(Character, "^Kl-ADI-MUNDI$", "KI-ADI-MUNDI")) %>% 
+  mutate(Character = str_replace(Character, "^MACE$|^MACE W[il]NDU$", "MACE WINDU")) %>% 
+  mutate(Character = str_replace(Character, "^OBI-WAN $", "OBI-WAN")) %>% 
+  mutate(Character = str_replace(Character, "QUI ?-GON", "QUI-GON")) %>% 
+  mutate(Character = str_replace(Character, "SUPER BATTLE DROID 2", "SUPER BATTLE DROID 3")) %>% 
+  mutate(Character = str_replace(Character, "SUPER BATTLE DROID 1", "SUPER BATTLE DROID 2")) %>% 
+  mutate(Character = str_replace(Character, "^SUPER BATTLE DROID$", "SUPER BATTLE DROID 1")) %>% 
+  mutate(Character = str_replace(Character, "TlON MEDON", "TION MEDON")) %>% 
+  filter(!str_detect(Character, "^PALPATINE ")) %>% 
+  separate_rows(Character, sep = "/")
+
+# Clean up the lines and remove any parantheses along with text inside them
+script <- script %>% 
+  mutate(Line = str_replace_all(Line, " ?\\([^\\(\\)]*\\) ?", " ")) %>% 
+  mutate(Line = str_replace_all(Line, "\u0085", "…")) %>% 
+  mutate(Line = str_trim(str_replace_all(Line, "\u0092", "'")))
+```
+
+After cleaning up the script, we have the following table:
+
+```{r show_script, echo = FALSE}
+# Show the script
+kable(script)
+```
+
+We can also identify who had the most lines. We see that Anakin had the most lines followed by Obi-Wan, Padme, and Palpatine. This makes sense as they are the main characters in the movie.
+
+```{r count_character_lines, echo = FALSE}
+# Show the total number of lines for each character
+script %>% 
+  count(Character, name = "Total") %>% 
+  arrange(desc(Total)) %>% 
+  kable()
+```
+
+
+# Sentiment Analysis - Bing
+We first analyzed the data using the Bing sentiments, which allowed for a simple sentiment analysis by categorizing the tokens as either positive or negative. Not all words received a sentiment, however, as some words are not present in the Bing sentiments.
+
+It is also important to note that stop words were removed since they provide minimal to no value for the analysis.
+
+```{r tokenize_script_bing, include = FALSE}
+# Tokenize the lines, filter out stop words, and merge the Bing sentiments to the script
+script_tokenized_bing <- script %>% 
+  unnest_tokens(
+    Word, 
+    Line, 
+    token = "regex", 
+    pattern = "([^A-Za-z\\d'-]|'(?![A-Za-z\\d]))"
+  ) %>% 
+  filter(!(Word %in% stop_words$word)) %>% 
+  left_join(
+    rename(get_sentiments("bing"), Word = word, Sentiment = sentiment), 
+    by = "Word"
+  ) %>% 
+  mutate(Sentiment = capitalize(Sentiment))
+```
+
+After tokenizing and adding the sentiments to the words in the script, we observed the most common word was `jedi`.
+
+```{r show_top_30_words, echo = FALSE}
+# Show the 30 most commonly spoken words in the movie
+script_tokenized_bing %>% 
+  count(Word, name = "Total") %>% 
+  arrange(desc(Total)) %>% 
+  slice(1:30) %>% 
+  kable()
+```
+
+Out of the positive words, the most common word was `master`, which was more prevalent than the next 6 positive words combined!
+
+```{r show_top_20_positive_words, echo = FALSE}
+# Show the 20 most common positive words in the movie
+script_tokenized_bing %>% 
+  filter(Sentiment == "Positive") %>% 
+  count(Word, name = "Total") %>% 
+  arrange(desc(Total)) %>% 
+  slice(1:20) %>% 
+  kable()
+```
+
+Out of the negative words, the most common word was `dark`.
+
+```{r show_top_20_negative_words, echo = FALSE}
+# Show the 20 most common negative words in the movie
+script_tokenized_bing %>% 
+  filter(Sentiment == "Negative") %>% 
+  count(Word, name = "Total") %>% 
+  arrange(desc(Total)) %>% 
+  slice(1:20) %>% 
+  kable()
+```
+
+Despite `master` being the most prevalent word out of all the words with sentiments, there were significantly more negative words than positive words.
+
+```{r show_sentiment_totals_bing, echo = FALSE}
+# Show the total number of positive and negative sentiments
+script_tokenized_bing %>% 
+  filter(!is.na(Sentiment)) %>% 
+  count(Sentiment, name = "Total") %>% 
+  arrange(Total) %>% 
+  kable()
+```
+
+The following graph is a visual representation of total number of positive and negative sentiments.
+
+```{r plot_sentiment_totals_bing, echo = FALSE, fig.align = "center"}
+# Plot the total number of positive and negative sentiments
+script_tokenized_bing %>% 
+  filter(!is.na(Sentiment)) %>% 
+  count(Sentiment, name = "Total") %>% 
+  ggplot(aes(reorder(Sentiment, Total), Total)) + 
+  geom_bar(aes(fill = Sentiment), stat = "identity", show.legend = FALSE) + 
+  ggtitle("Frequency of Positive vs. Negative Sentiments (Bing)") + 
+  labs(
+    x = "Sentiment", 
+    y = "Frequency", 
+    caption = "Star Wars Episode III - Revenge of the Sith"
+  ) + 
+  theme_bw()
+```
+
+For a movie that was about the downfall of the Galactic Republic, the manipulation of a powerful Jedi knight who feared the death of his wife, the extermination of the Jedi, and the rise of the Galactic Empire that is ruled by a ruthless Sith lord, it made sense that there would be more negative sentiments than positive sentiments. However, we wanted to reveal who was the most positive and who was the most negative.
+
+For each character, the spread was calculated by subtracting the number of negative sentiments from the number of positive sentiments. Since some characters didn't have either positive or negative sentiments, the missing values were filled with 0.
+
+The following table shows the spreads for each character. It is worth noting that most of the characters were generally negative. Also, while Nute Gunray was the most positive, he didn't have too much dialogue. In contrast, Palpatine was the most negative and had substantially more lines of dialogue. Surprisingly, Obi-Wan was the 2nd-most negative character despite being a good character while Anakin was the 2nd-most positive character despite evenutally being an evil character.
+
+```{r show_sentiment_spreads_by_character_bing, echo = FALSE}
+# Show the number of positive and negative sentiments for each character
+script_tokenized_bing %>% 
+  count(Character, Sentiment, name = "Total") %>% 
+  spread(Sentiment, Total) %>% 
+  rename("NA" = `<NA>`) %>% 
+  mutate_if(is.numeric, ~replace(., is.na(.), 0)) %>% 
+  mutate(Spread = Positive - Negative) %>% 
+  arrange(desc(Spread)) %>% 
+  kable()
+```
+
+The following graph visualizes the number of positive and negative sentiments for the 9 most important characters.
+
+```{r plot_sentiments_top_characters_bing, echo = FALSE, fig.align = "center"}
+# Plot the sentiments of the 9 most important characters
+script_tokenized_bing %>% 
+  filter(
+    Character %in% c(
+      "ANAKIN", "OBI-WAN", "PADME", "PALPATINE", "YODA", 
+      "MACE WINDU", "C-3PO", "COUNT DOOKU", "GENERAL GRIEVOUS"
+    ) & !is.na(Sentiment)
+  ) %>% 
+  count(Character, Sentiment, name = "Total") %>% 
+  ggplot(aes(Sentiment, Total)) + 
+  geom_col(aes(fill = Sentiment), show.legend = FALSE) + 
+  facet_wrap(~Character, scales = "free_x") + 
+  ggtitle("Frequency of Positive vs. Negative Sentiments By Character (Bing)") + 
+  labs(y = "Frequency", caption = "Star Wars Episode III - Revenge of the Sith") + 
+  coord_flip() + 
+  theme_bw()
+```
+
+For those same 9 characters, we can observe the words they have used the most. In the following graph, we see that Obi-Wan and Padme each say `anakin` the most while Anakin says `master` the most. Palpatine also says `anakin` quite frequently, but not as much as the word `jedi`.
+
+```{r plot_common_words_by_top_character, echo = FALSE, fig.align = "center"}
+# Plot the most commonly used words by each of the most important characters
+script_tokenized_bing %>% 
+  filter(
+    Character %in% c(
+      "ANAKIN", "OBI-WAN", "PADME", "PALPATINE", "YODA", 
+      "MACE WINDU", "C-3PO", "COUNT DOOKU", "GENERAL GRIEVOUS"
+    )
+  ) %>% 
+  count(Character, Word, name = "Total") %>% 
+  group_by(Character) %>% 
+  arrange(desc(Total)) %>% 
+  slice(1:10) %>% 
+  ungroup() %>% 
+  mutate(
+    Word = factor(
+      paste(Word, Character, sep = "_"), 
+      levels = rev(paste(Word, Character, sep = "_"))
+    )
+  ) %>% 
+  ggplot(aes(Word, Total)) + 
+  geom_col(aes(fill = Character), show.legend = FALSE) + 
+  facet_wrap(~Character, scales = "free_y") + 
+  ggtitle("Most Commonly Spoken Words By Character") + 
+  labs(y = "Frequency", caption = "Star Wars Episode III - Revenge of the Sith") + 
+  scale_x_discrete(labels = function(word) str_replace(word, "_.+$", "")) + 
+  coord_flip() + 
+  theme_bw()
+```
+
+Along with word frequency, we also identified the words that were relevant to each character. In other words, we identified the words that were spoken almost uniquely by that character. In the following graph, we can see that words like `vader` were commonly used by Palpatine. For Mace Windu, the top word was the sound of Mace Windu grunting as he held off Palpatine's force lightning attack with his lightsaber.
+
+```{r plot_relevant_words_by_top_character_bing, echo = FALSE, fig.align = "center"}
+# Plot the most relevant words for each of the most important characters
+script_tokenized_bing %>% 
+  filter(
+    Character %in% c(
+      "ANAKIN", "OBI-WAN", "PADME", "PALPATINE", "YODA", 
+      "MACE WINDU", "C-3PO", "COUNT DOOKU", "GENERAL GRIEVOUS"
+    )
+  ) %>% 
+  count(Character, Word, name = "Total") %>% 
+  bind_tf_idf(Word, Character, Total) %>% 
+  group_by(Character) %>% 
+  arrange(desc(tf_idf)) %>% 
+  slice(1:10) %>% 
+  ungroup() %>% 
+  mutate(
+    Word = factor(
+      paste(Word, Character, sep = "_"), 
+      levels = rev(paste(Word, Character, sep = "_"))
+    )
+  ) %>% 
+  ggplot(aes(Word, tf_idf)) + 
+  geom_col(aes(fill = Character), show.legend = FALSE) + 
+  facet_wrap(~Character, scales = "free_y") + 
+  ggtitle("Most Relevant Words For Each Character (Bing)") + 
+  labs(y = "Frequency", caption = "Star Wars Episode III - Revenge of the Sith") + 
+  scale_x_discrete(labels = function(word) str_replace(word, "_.+$", "")) + 
+  coord_flip() + 
+  theme_bw()
+```
+
+
+# Sentiment Analysis - NRC
+We decided to try the NRC sentiments as they provided a wider range of sentiments.
+
+```{r tokenize_script_nrc, include = FALSE}
+# Tokenize the lines, filter out stop words, and merge the NRC sentiments to the script
+script_tokenized_nrc <- script %>% 
+  unnest_tokens(
+    Word, 
+    Line, 
+    token = "regex", 
+    pattern = "([^A-Za-z\\d'-]|'(?![A-Za-z\\d]))"
+  ) %>% 
+  filter(!(Word %in% stop_words$word)) %>% 
+  left_join(
+    rename(get_sentiments("nrc"), Word = word, Sentiment = sentiment), 
+    by = "Word"
+  ) %>% 
+  mutate(Sentiment = capitalize(Sentiment))
+```
+
+The following table shows the total number of words for each sentiment.
+
+```{r show_sentiment_totals_nrc, echo = FALSE}
+# Show the frequency of each sentiment in the movie
+script_tokenized_nrc %>% 
+  filter(!is.na(Sentiment)) %>% 
+  count(Sentiment, name = "Total") %>% 
+  arrange(desc(Total)) %>% 
+  kable()
+```
+
+The following is a visualization of the table directly above.
+
+```{r plot_sentiment_totals_nrc, echo = FALSE, fig.align = "center"}
+# Plot the frequency of each sentiment in the movie
+script_tokenized_nrc %>% 
+  filter(!is.na(Sentiment)) %>% 
+  count(Sentiment, name = "Total") %>% 
+  ggplot(aes(reorder(Sentiment, desc(Total)), Total)) + 
+  geom_bar(aes(fill = Sentiment), stat = "identity", show.legend = FALSE) + 
+  ggtitle("Frequency of Sentiment Types (NRC)") + 
+  labs(
+    x = "Sentiment", 
+    y = "Frequency", 
+    caption = "Star Wars Episode III - Revenge of the Sith"
+  ) + 
+  theme_bw()
+```
+
+Similar to the previous analysis, we evaluated the frequency of each sentiment for each character. The spread is defined by the following formula:
+
+$$Spread = N_{Anticipation} + N_{Joy} + N_{Positive} + N_{Surprise} + N_{Trust} - (N_{Anger} + N_{Disgust} + N_{Fear} + N_{Negative} + N_{Sadness})$$
+
+Where each N represents the total number of words with that sentiment.
+
+The following table shows the spreads for each character. Surprisingly, Obi-Wan was the 2nd-most positive instead of the 2nd-most negative. Also, Anakin was the most positive and Ki-Adi-Mundi was the most negative when using the NRC sentiments.
+
+```{r show_sentiment_spreads_by_character_nrc, echo = FALSE}
+# Show the frequency of each sentiments for each character
+script_tokenized_nrc %>% 
+  count(Character, Sentiment, name = "Total") %>% 
+  spread(Sentiment, Total) %>% 
+  rename("NA" = `<NA>`) %>% 
+  mutate_if(is.numeric, ~replace(., is.na(.), 0)) %>% 
+  mutate(
+    Spread = Anticipation + Joy + Positive + Surprise + Trust 
+             - Anger - Disgust - Fear - Negative - Sadness
+  ) %>% 
+  arrange(desc(Spread)) %>% 
+  kable()
+```
+
+The following graph shows the frequency of each sentiment by the 9 most important characters. We can see that Palpatine had more angry sentiments than the others.
+
+```{r plot_sentiments_top_characters_nrc, echo = FALSE, fig.align = "center"}
+# Plot the sentiments of the 9 most important characters
+script_tokenized_nrc %>% 
+  filter(
+    Character %in% c(
+      "ANAKIN", "OBI-WAN", "PADME", "PALPATINE", "YODA", 
+      "MACE WINDU", "C-3PO", "COUNT DOOKU", "GENERAL GRIEVOUS"
+    ) & !is.na(Sentiment)
+  ) %>% 
+  count(Character, Sentiment, name = "Total") %>% 
+  ggplot(aes(reorder(Sentiment, desc(Sentiment)), Total)) + 
+  geom_col(aes(fill = Sentiment), show.legend = FALSE) + 
+  facet_wrap(~Character, scales = "free_x") + 
+  ggtitle("Frequency of Sentiment Types By Character (NRC)") + 
+  labs(
+    x = "Sentiment", 
+    y = "Frequency", 
+    caption = "Star Wars Episode III - Revenge of the Sith"
+  ) + 
+  coord_flip() + 
+  theme_bw()
+```
+
+The following graph shows the 10 most common words by sentiment.
+
+```{r plot_common_words_by_sentiment, echo = FALSE, fig.align = "center"}
+# Plot the most commonly used words by sentiment
+script_tokenized_nrc %>% 
+  count(Sentiment, Word, name = "Total") %>% 
+  group_by(Sentiment) %>% 
+  arrange(desc(Total)) %>% 
+  slice(1:10) %>% 
+  ungroup() %>% 
+  mutate(
+    Word = factor(
+      paste(Word, Sentiment, sep = "_"), 
+      levels = rev(paste(Word, Sentiment, sep = "_"))
+    )
+  ) %>% 
+  ggplot(aes(Word, Total)) + 
+  geom_col(aes(fill = Sentiment), show.legend = FALSE) + 
+  facet_wrap(~Sentiment, scales = "free_y") + 
+  ggtitle("Most Commonly Spoken Words By Sentiment (NRC)") + 
+  labs(y = "Frequency", caption = "Star Wars Episode III - Revenge of the Sith") + 
+  scale_x_discrete(labels = function(word) str_replace(word, "_.+$", "")) + 
+  coord_flip() + 
+  theme_bw()
+```
+
+Using the NRC sentiments, we identified the most relevant words for each character. In the following graph, we see that Count Dooku and C-3PO frequently said `hate` and `weight` respectively. 
+
+```{r plot_relevant_words_by_top_character_nrc, echo = FALSE, fig.align = "center"}
+# Plot the most relevant words for each of the most important characters
+script_tokenized_nrc %>% 
+  filter(
+    Character %in% c(
+      "ANAKIN", "OBI-WAN", "PADME", "PALPATINE", "YODA", 
+      "MACE WINDU", "C-3PO", "COUNT DOOKU", "GENERAL GRIEVOUS"
+    )
+  ) %>% 
+  count(Character, Word, name = "Total") %>% 
+  bind_tf_idf(Word, Character, Total) %>% 
+  group_by(Character) %>% 
+  arrange(desc(tf_idf)) %>% 
+  slice(1:10) %>% 
+  ungroup() %>% 
+  mutate(
+    Word = factor(
+      paste(Word, Character, sep = "_"), 
+      levels = rev(paste(Word, Character, sep = "_"))
+    )
+  ) %>% 
+  ggplot(aes(Word, tf_idf)) + 
+  geom_col(aes(fill = Character), show.legend = FALSE) + 
+  facet_wrap(~Character, scales = "free_y") + 
+  ggtitle("Most Relevant Words For Each Character (NRC)") + 
+  labs(y = "Frequency", caption = "Star Wars Episode III - Revenge of the Sith") + 
+  scale_x_discrete(labels = function(word) str_replace(word, "_.+$", "")) + 
+  coord_flip() + 
+  theme_bw()
+```
+
+
+# Conclusion
+The analysis revealed that the most common word was `jedi`. The most common positive word was overwhelmingly `master` and the most common negative word was `dark`. Despite Anakin's conversion to the dark side, Anakin was among the most positive characters in the movie according to the Bing and NRC sentiments. Ki-Adi-Mundi was among the most negative, which was a surprise when considering he was a Jedi.
+
+Using the Bing sentiments, the characters were considered to be generally negative. Out of the 9 most important characters in the movie, only Anakin was more positive than negative. The rest were much more negative. The most commonly spoken word by Padme and Obi-Wan were `anakin`, whereas Anakin said `master` the most.
+
+The NRC sentiments produced contrasting results, where the majority of the characters' spreads were positive. Using the NRC sentiments also revealed that `chancellor` was the most common word with the `Trust` sentiment.
