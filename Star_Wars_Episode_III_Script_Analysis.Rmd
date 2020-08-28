@@ -6,7 +6,8 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-library(knitr)
+#library(knitr)
+if (!require(kableExtra)) { install.packages("kableExtra"); library(kableExtra) }
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -104,7 +105,7 @@ After cleaning up the script, we have the following table:
 
 ```{r show_script, echo = FALSE}
 # Show the script
-kable(script)
+kable(script) %>% kable_styling("striped")
 ```
 
 We can also identify who had the most lines. We see that Anakin had the most lines followed by Obi-Wan, Padme, and Palpatine. This makes sense as they are the main characters in the movie.
@@ -114,7 +115,8 @@ We can also identify who had the most lines. We see that Anakin had the most lin
 script %>% 
   count(Character, name = "Total") %>% 
   arrange(desc(Total)) %>% 
-  kable()
+  kable() %>% 
+  kable_styling("striped")
 ```
 
 
@@ -148,7 +150,8 @@ script_tokenized_bing %>%
   count(Word, name = "Total") %>% 
   arrange(desc(Total)) %>% 
   slice(1:30) %>% 
-  kable()
+  kable() %>% 
+  kable_styling("striped")
 ```
 
 Out of the positive words, the most common word was `master`, which was more prevalent than the next 6 positive words combined!
@@ -160,7 +163,8 @@ script_tokenized_bing %>%
   count(Word, name = "Total") %>% 
   arrange(desc(Total)) %>% 
   slice(1:20) %>% 
-  kable()
+  kable() %>% 
+  kable_styling("striped")
 ```
 
 Out of the negative words, the most common word was `dark`.
@@ -172,7 +176,8 @@ script_tokenized_bing %>%
   count(Word, name = "Total") %>% 
   arrange(desc(Total)) %>% 
   slice(1:20) %>% 
-  kable()
+  kable() %>% 
+  kable_styling("striped")
 ```
 
 Despite `master` being the most prevalent word out of all the words with sentiments, there were significantly more negative words than positive words.
@@ -183,7 +188,8 @@ script_tokenized_bing %>%
   filter(!is.na(Sentiment)) %>% 
   count(Sentiment, name = "Total") %>% 
   arrange(Total) %>% 
-  kable()
+  kable() %>% 
+  kable_styling("striped")
 ```
 
 The following graph is a visual representation of total number of positive and negative sentiments.
@@ -219,7 +225,8 @@ script_tokenized_bing %>%
   mutate_if(is.numeric, ~replace(., is.na(.), 0)) %>% 
   mutate(Spread = Positive - Negative) %>% 
   arrange(desc(Spread)) %>% 
-  kable()
+  kable() %>% 
+  kable_styling("striped")
 ```
 
 The following graph visualizes the number of positive and negative sentiments for the 9 most important characters.
@@ -337,7 +344,8 @@ script_tokenized_nrc %>%
   filter(!is.na(Sentiment)) %>% 
   count(Sentiment, name = "Total") %>% 
   arrange(desc(Total)) %>% 
-  kable()
+  kable() %>% 
+  kable_styling("striped")
 ```
 
 The following is a visualization of the table directly above.
@@ -378,7 +386,8 @@ script_tokenized_nrc %>%
              - Anger - Disgust - Fear - Negative - Sadness
   ) %>% 
   arrange(desc(Spread)) %>% 
-  kable()
+  kable() %>% 
+  kable_styling("striped")
 ```
 
 The following graph shows the frequency of each sentiment by the 9 most important characters. We can see that Palpatine had more angry sentiments than the others.

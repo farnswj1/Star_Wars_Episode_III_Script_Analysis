@@ -7,7 +7,6 @@ if (!require(tidyverse)) { install.packages("tidyverse"); library(tidyverse) }
 if (!require(tidytext)) { install.packages("tidytext"); library(tidytext) }
 if (!require(R.utils)) { install.packages("R.utils"); library(R.utils) }
 if (!require(rvest)) { install.packages("rvest"); library(rvest) }
-if (!require(sentimentr)) { install.packages("sentimentr"); library(sentimentr) }
 
 
 # Loading The Data
