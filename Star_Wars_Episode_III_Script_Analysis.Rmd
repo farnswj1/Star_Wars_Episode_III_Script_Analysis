@@ -6,7 +6,6 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-#library(knitr)
 if (!require(kableExtra)) { install.packages("kableExtra"); library(kableExtra) }
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -105,7 +104,10 @@ After cleaning up the script, we have the following table:
 
 ```{r show_script, echo = FALSE}
 # Show the script
-kable(script) %>% kable_styling("striped")
+script %>% 
+  kable() %>% 
+  kable_styling("striped") %>% 
+  scroll_box(width = "100%", height = "600px")
 ```
 
 We can also identify who had the most lines. We see that Anakin had the most lines followed by Obi-Wan, Padme, and Palpatine. This makes sense as they are the main characters in the movie.

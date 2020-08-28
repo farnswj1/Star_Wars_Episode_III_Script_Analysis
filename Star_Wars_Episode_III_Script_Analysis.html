@@ -453,13 +453,14 @@ script &lt;- script %&gt;%
   mutate(Line = str_replace_all(Line, &quot;\u0085&quot;, &quot;…&quot;)) %&gt;% 
   mutate(Line = str_trim(str_replace_all(Line, &quot;\u0092&quot;, &quot;&#39;&quot;)))</code></pre>
 <p>After cleaning up the script, we have the following table:</p>
+<div style="border: 1px solid #ddd; padding: 0px; overflow-y: scroll; height:600px; overflow-x: scroll; width:100%; ">
 <table class="table table-striped" style="margin-left: auto; margin-right: auto;">
 <thead>
 <tr>
-<th style="text-align:left;">
+<th style="text-align:left;position: sticky; top:0; background-color: #FFFFFF;">
 Character
 </th>
-<th style="text-align:left;">
+<th style="text-align:left;position: sticky; top:0; background-color: #FFFFFF;">
 Line
 </th>
 </tr>
@@ -9699,6 +9700,7 @@ Oh, no.
 </tr>
 </tbody>
 </table>
+</div>
 <p>We can also identify who had the most lines. We see that Anakin had the most lines followed by Obi-Wan, Padme, and Palpatine. This makes sense as they are the main characters in the movie.</p>
 <table class="table table-striped" style="margin-left: auto; margin-right: auto;">
 <thead>
